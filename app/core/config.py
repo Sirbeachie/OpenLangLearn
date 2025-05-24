@@ -4,6 +4,11 @@ from pydantic import BaseSettings
 from dotenv import load_dotenv
 import os
 
+from dotenv import load_dotenv
+import os
+from pathlib import Path # Import Path
+import logging # For logging directory creation
+
 # Load .env file before importing BaseSettings to ensure environment variables are set
 load_dotenv()
 
@@ -35,21 +40,50 @@ class Settings(BaseSettings):
     # Generate a strong secret key, e.g., using: openssl rand -hex 32
     FASTAPI_USERS_SECRET: str = os.getenv("FASTAPI_USERS_SECRET", "REPLACE_THIS_WITH_A_REAL_SECRET_KEY_IN_PRODUCTION")
 
+    # Storage Settings
+    # Note: For Pydantic v1, use pattern with Field, or validate in a validator.
+    # For Pydantic v2, Literal["s3", "local"] would be ideal.
+    # Here, we rely on os.getenv and provide a default, with a runtime check below.
+    STORAGE_TYPE: str = os.getenv("STORAGE_TYPE", "s3").lower() # Default to "s3", ensure lowercase
+    LOCAL_STORAGE_PATH: Path = Path(os.getenv("LOCAL_STORAGE_PATH", "media_storage"))
+
 
     class Config:
-        env_file = ".env" # Pydantic will also try to load this, useful for Pydantic specific .env features
+        env_file = ".env" 
         env_file_encoding = 'utf-8'
-        # Pydantic v2: extra = 'ignore' # To ignore extra fields from .env not defined in Settings
-        # For Pydantic v1, extra fields are ignored by default unless `extra = Extra.allow`
+        # Pydantic v2: extra = 'ignore' 
+        # Pydantic v1: extra fields ignored by default.
 
 settings = Settings()
 
-# Ensure TASK_TEMP_BASE_DIR exists
-# Note: This will run when config.py is imported.
-# Consider moving this to an application startup event if preferred.
+# Initialize logger for config messages
+config_logger = logging.getLogger(__name__)
+# Ensure basicConfig is called if no other logging is set up by this point
+# This is a simple setup; a more robust app would have a centralized logging config.
+if not logging.getLogger().hasHandlers():
+    logging.basicConfig(level=settings.LOG_LEVEL)
+
+
+# Validate and ensure directory for TASK_TEMP_BASE_DIR
 if not os.path.exists(settings.TASK_TEMP_BASE_DIR):
     try:
         os.makedirs(settings.TASK_TEMP_BASE_DIR, exist_ok=True)
-        print(f"Successfully created TASK_TEMP_BASE_DIR: {settings.TASK_TEMP_BASE_DIR}")
+        config_logger.info(f"Successfully created TASK_TEMP_BASE_DIR: {settings.TASK_TEMP_BASE_DIR}")
     except Exception as e:
-        print(f"Error creating TASK_TEMP_BASE_DIR {settings.TASK_TEMP_BASE_DIR}: {e}")
+        config_logger.error(f"Error creating TASK_TEMP_BASE_DIR {settings.TASK_TEMP_BASE_DIR}: {e}")
+
+# Validate STORAGE_TYPE and ensure directory for LOCAL_STORAGE_PATH if type is "local"
+if settings.STORAGE_TYPE not in ["s3", "local"]:
+    config_logger.warning(
+        f"Invalid STORAGE_TYPE: '{settings.STORAGE_TYPE}'. Must be 's3' or 'local'. Defaulting to 's3'."
+    )
+    settings.STORAGE_TYPE = "s3" # Fallback to a safe default
+
+if settings.STORAGE_TYPE == "local":
+    try:
+        settings.LOCAL_STORAGE_PATH.mkdir(parents=True, exist_ok=True)
+        config_logger.info(f"Using local storage. Ensured directory exists at: {settings.LOCAL_STORAGE_PATH.resolve()}")
+    except Exception as e:
+        config_logger.error(f"Error creating LOCAL_STORAGE_PATH {settings.LOCAL_STORAGE_PATH.resolve()}: {e}")
+        # Potentially raise an error or switch to a fallback storage type if local path is critical and fails
+        # For now, just log the error.

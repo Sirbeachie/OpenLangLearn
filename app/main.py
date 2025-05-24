@@ -6,9 +6,12 @@ from app.core.config import settings # Using the settings from config.py
 # Ensure all models are imported for table creation
 from app.models import user, media 
 from app.models.subtitle import SubtitleCue, Word 
-from app.models.familiarity import Familiarity # Import the new Familiarity model
+from app.models.familiarity import Familiarity
 from app.core import users as core_users
 from app.api import words_api 
+from app.api import files_api # Import the new files API router
+from app.core.storage_service import StorageInterface, get_storage_service
+import logging # For logging in main
 
 # Database setup
 # Using the DATABASE_URL from settings
@@ -65,6 +68,22 @@ def on_startup():
     # You can also override the get_db_session in endpoints.py for FastAPI's dependency injection
     # This makes the actual session available to the endpoints
     api_endpoints.get_db_session = get_db_session
+    # Override placeholder in words_api too
+    words_api.get_db_session = get_db_session
+    # Override placeholder in files_api too, if it uses get_db_session
+    if hasattr(files_api, 'get_db_session'): # Check if files_api has this placeholder
+        files_api.get_db_session = get_db_session
+
+
+    # Provide StorageInterface dependency globally
+    app.dependency_overrides[StorageInterface] = get_storage_service
+
+    # Conditionally include the local static files router
+    if settings.STORAGE_TYPE == "local":
+        app.include_router(files_api.router, prefix="/api/v1", tags=["static-files"])
+        logging.info("Local file serving endpoint (/api/v1/static-files) is ACTIVE.")
+    else:
+        logging.info("Local file serving endpoint is NOT active as STORAGE_TYPE is not 'local'.")
 
 
 @app.get("/")

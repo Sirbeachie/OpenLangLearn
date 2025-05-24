@@ -12,36 +12,35 @@ import logging
 logger = logging.getLogger(__name__)
 
 # UPLOAD_DIRECTORY = "media_uploads" # No longer saving locally first for uploads
+from app.core.storage_service import StorageInterface # Import StorageInterface
 
 class MediaService:
-    def __init__(self, db_session: Session):
+    def __init__(self, db_session: Session, storage_service: StorageInterface):
         self.db_session = db_session
-        self.s3_client = get_s3_client() # Initialize S3 client once per service instance
+        # self.s3_client = get_s3_client() # REMOVED: S3 client is now part of StorageService
+        self.storage_service = storage_service
 
     async def save_uploaded_video(self, file: UploadFile, owner_id: int, language: str) -> Media:
-        if not self.s3_client:
-            logger.error("MediaService: S3 client not available. Cannot upload video.")
-            raise HTTPException(status_code=500, detail="S3 storage service not configured.")
+        # if not self.s3_client: # Replaced with storage_service check if needed, but factory should handle it
+        #     logger.error("MediaService: S3 client not available. Cannot upload video.")
+        #     raise HTTPException(status_code=500, detail="S3 storage service not configured.")
 
-        # Sanitize filename slightly, though S3 handles most characters.
-        # Consider more robust slugification if needed.
         safe_filename = os.path.basename(file.filename) if file.filename else "untitled_video"
         
-        # Define S3 object key
-        s3_object_key = f"uploads/user_{owner_id}/{safe_filename}"
+        # Define destination path (S3 key or local relative path)
+        # This path structure is consistent for both S3 and local storage.
+        destination_path = f"uploads/user_{owner_id}/{safe_filename}"
         
-        # Upload the file stream directly to S3
-        # file.file is a SpooledTemporaryFile, which is file-like
-        success = upload_file_to_s3(
-            file_path_or_obj=file.file, 
-            bucket_name=settings.S3_BUCKET_NAME, 
-            object_name=s3_object_key,
-            s3_client=self.s3_client
-        )
-        
-        if not success:
-            logger.error(f"Failed to upload video '{safe_filename}' to S3 for owner {owner_id}.")
-            raise HTTPException(status_code=500, detail="Failed to upload video to S3.")
+        try:
+            # Use the storage service to save the file
+            # file.file is a SpooledTemporaryFile, which is file-like and works with upload_fileobj
+            stored_path = await self.storage_service.save_file(
+                file_obj=file.file, 
+                destination_path=destination_path
+            )
+        except (ConnectionError, IOError) as e: # Catch errors from storage service
+            logger.error(f"Failed to save video '{safe_filename}' via storage service for owner {owner_id}: {e}")
+            raise HTTPException(status_code=500, detail=f"Failed to save video: {e}")
             
         media_entry = Media(
             owner_id=owner_id,
