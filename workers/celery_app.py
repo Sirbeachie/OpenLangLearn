@@ -1,12 +1,12 @@
 # Celery application setup
 from celery import Celery
+from app.core.config import settings # Import centralized settings
 
-# It's recommended to use a configuration object for settings
-# For now, we'll use a basic setup
+# Initialize Celery app with settings from the config module
 celery_app = Celery(
     "worker",
-    broker="redis://localhost:6379/0",  # Example broker, replace with your choice
-    backend="redis://localhost:6379/0"  # Example backend, replace with your choice
+    broker=settings.CELERY_BROKER_URL,
+    backend=settings.CELERY_RESULT_BACKEND
 )
 
 celery_app.conf.update(

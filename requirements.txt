@@ -26,3 +26,8 @@ python-multipart # For FastAPI File Uploads (Form data)
 openai-whisper # For audio transcription
 SudachiPy
 SudachiDict-core
+boto3 # For S3 integration
+python-dotenv # For loading .env files
+fastapi-users[sqlalchemy] # Core package with SQLAlchemy support
+fastapi-users-db-sqlmodel # SQLModel adapter for FastAPI-Users
+python-jose[cryptography] # For JWT
