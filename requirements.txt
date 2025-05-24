@@ -1,0 +1,28 @@
+fastapi
+uvicorn[standard]
+sqlmodel
+celery
+redis
+# Add other specific dependencies here, for example:
+# pydantic[email] for email validation in models/schemas
+# python-jose[cryptography] for JWT tokens
+# passlib[bcrypt] for password hashing
+# sqlalchemy # Already a dependency of sqlmodel, but good to list if using its features directly
+
+# For Japanese NLP (example, choose one or more as needed)
+# janome
+# sudachipy
+# sudachidict_core
+# mecab-python3
+# fugashi[unidic-lite] # for MeCab with UniDic
+# pykakasi
+
+# For other language plugins, list their dependencies here.
+
+# Testing
+# pytest
+# httpx # for testing FastAPI endpoints
+python-multipart # For FastAPI File Uploads (Form data)
+openai-whisper # For audio transcription
+SudachiPy
+SudachiDict-core
