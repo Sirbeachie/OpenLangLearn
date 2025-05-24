@@ -2,8 +2,11 @@
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional, List
 from app.models.media import Media # Added to ensure Relationship can use Media
+from sqlalchemy import UniqueConstraint # Import UniqueConstraint
 
 class Word(SQLModel, table=True):
+    __table_args__ = (UniqueConstraint("lemma", "language", name="uq_word_lemma_language"),)
+    
     id: int = Field(default=None, primary_key=True)
     lemma: str = Field(index=True) # The dictionary form of the word
     language: str = Field(index=True) # Language of the lemma, e.g., 'en', 'ja'

@@ -4,9 +4,11 @@ from sqlmodel import SQLModel, create_engine, Session
 from app.api import endpoints as api_endpoints # Renamed to avoid conflict
 from app.core.config import settings # Using the settings from config.py
 # Ensure all models are imported for table creation
-from app.models import user, media # user.py now contains FastAPI-Users compatible User model
+from app.models import user, media 
 from app.models.subtitle import SubtitleCue, Word 
-from app.core import users as core_users # Import the users module for routers
+from app.models.familiarity import Familiarity # Import the new Familiarity model
+from app.core import users as core_users
+from app.api import words_api 
 
 # Database setup
 # Using the DATABASE_URL from settings
@@ -45,6 +47,12 @@ app.include_router(
     core_users.users_router, 
     prefix="/api/v1/users", 
     tags=["users"]
+)
+# Include the new words API router
+app.include_router(
+    words_api.router,
+    prefix="/api/v1", # Using the same v1 prefix
+    tags=["words"]     # Tag for API docs
 )
 # If using reset password or verify routers, include them here as well.
 # app.include_router(core_users.reset_password_router, prefix="/auth", tags=["auth"])
