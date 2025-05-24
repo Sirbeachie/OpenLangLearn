@@ -59,3 +59,22 @@ class FamiliarityService:
         
         logger.info(f"Successfully upserted familiarity for user_id: {user_id}, word_id: {word_id}. New score: {familiarity_record.score}")
         return familiarity_record
+
+    def get_batch_familiarity(self, db: Session, user_id: int, word_ids: list[int]) -> list[Familiarity]:
+        """
+        Retrieves multiple Familiarity records for the given user_id and a list of word_ids.
+        """
+        if not word_ids: # Handle empty list of word_ids if necessary
+            return []
+            
+        logger.info(f"Fetching batch familiarity for user_id: {user_id}, word_ids: {word_ids}")
+        
+        familiarity_records = db.exec(
+            select(Familiarity).where(
+                Familiarity.user_id == user_id,
+                Familiarity.word_id.in_(word_ids) # Use .in_() for list membership
+            )
+        ).all()
+        
+        logger.info(f"Found {len(familiarity_records)} familiarity records for user_id: {user_id} out of {len(word_ids)} requested word_ids.")
+        return list(familiarity_records) # Ensure it's a list

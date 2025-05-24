@@ -137,3 +137,35 @@ async def set_word_familiarity(
         
     logger.info(f"Successfully set familiarity for word_id: {word_id}, user: {current_user.id}. New score: {updated_familiarity.score}")
     return updated_familiarity
+
+
+from typing import List # Import List for response model
+
+@router.post(
+    "/words/batch-familiarity",
+    response_model=List[FamiliarityRead],
+    summary="Get Batch Word Familiarity",
+    description="Retrieves familiarity scores for a list of words for the current user."
+)
+async def get_batch_word_familiarity(
+    request_data: BatchFamiliarityRequest,
+    db: Session = Depends(get_db_session),
+    current_user: User = Depends(current_active_user),
+    familiarity_service: FamiliarityService = Depends(get_familiarity_service)
+):
+    logger.info(f"User {current_user.id} fetching batch familiarity for {len(request_data.word_ids)} word_ids.")
+    if not db:
+        logger.error(f"DB session not available for batch_familiarity (user: {current_user.id}).")
+        raise HTTPException(status_code=500, detail="Database not configured")
+
+    if not request_data.word_ids:
+        logger.info(f"User {current_user.id} requested batch familiarity with an empty list of word_ids.")
+        return [] # Return empty list if no word_ids are provided
+
+    familiarity_records = familiarity_service.get_batch_familiarity(
+        db, user_id=current_user.id, word_ids=request_data.word_ids
+    )
+    
+    logger.info(f"Retrieved {len(familiarity_records)} familiarity records for user: {current_user.id} for {len(request_data.word_ids)} requested word_ids.")
+    # FastAPI will automatically convert List[Familiarity] to List[FamiliarityRead]
+    return familiarity_records

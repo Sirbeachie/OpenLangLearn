@@ -21,3 +21,6 @@ class FamiliarityCreate(BaseModel): # Using Pydantic BaseModel for request body
 
 class FamiliarityUpdate(FamiliarityCreate): # Can be the same as Create for this simple case
     pass
+
+class BatchFamiliarityRequest(BaseModel):
+    word_ids: list[int] = PydanticField(..., description="A list of word IDs to fetch familiarity scores for.")

@@ -99,3 +99,102 @@ async def get_media_status(
     
     logger.info(f"User {user.id} successfully retrieved media record with id: {media_id}, title: {media_record.title}")
     return media_record
+
+
+# --- Endpoints for Pre-signed URLs ---
+from app.schemas.media_schemas import MediaURLResponse # Response model for URLs
+from app.core.s3_client import generate_presigned_url, get_s3_client # S3 utilities
+from app.core.config import settings # For S3_BUCKET_NAME
+
+@router.get("/media/{media_id}/video-url", response_model=MediaURLResponse)
+async def get_media_video_url(
+    media_id: int,
+    db: Session = Depends(get_db_session),
+    user: User = Depends(current_active_user),
+    s3_client = Depends(get_s3_client) # Inject S3 client
+):
+    """
+    Generates a pre-signed URL to access the original video file for a media item.
+    Requires ownership.
+    """
+    logger.info(f"User {user.id} requesting video URL for media_id: {media_id}")
+    if not db:
+        logger.error(f"DB session not available for video-url (media_id: {media_id}, user: {user.id}).")
+        raise HTTPException(status_code=500, detail="Database not configured")
+    if not s3_client:
+        logger.error(f"S3 client not available for video-url (media_id: {media_id}, user: {user.id}).")
+        raise HTTPException(status_code=500, detail="S3 service not available")
+
+    media_record = db.get(Media, media_id)
+    if not media_record:
+        logger.warning(f"Video-URL: Media {media_id} not found (user: {user.id}).")
+        raise HTTPException(status_code=404, detail=f"Media with id {media_id} not found")
+
+    if media_record.owner_id != user.id:
+        logger.warning(f"Video-URL: User {user.id} attempt to access media {media_id} owned by {media_record.owner_id}. Denied.")
+        raise HTTPException(status_code=403, detail="Not authorized to access this media resource")
+
+    if not media_record.source_path:
+        logger.warning(f"Video-URL: Media {media_id} has no source_path (video S3 key) (user: {user.id}).")
+        raise HTTPException(status_code=404, detail="Video file not available for this media")
+
+    presigned_url = generate_presigned_url(
+        bucket_name=settings.S3_BUCKET_NAME,
+        object_name=media_record.source_path,
+        expiration=600, # 10 minutes
+        s3_client=s3_client
+    )
+
+    if not presigned_url:
+        logger.error(f"Video-URL: Failed to generate presigned URL for media {media_id}, S3 key {media_record.source_path} (user: {user.id}).")
+        raise HTTPException(status_code=500, detail="Could not generate video URL")
+    
+    logger.info(f"Video-URL: Successfully generated for media {media_id} (user: {user.id}).")
+    return MediaURLResponse(url=presigned_url)
+
+
+@router.get("/media/{media_id}/webvtt-url", response_model=MediaURLResponse)
+async def get_media_webvtt_url(
+    media_id: int,
+    db: Session = Depends(get_db_session),
+    user: User = Depends(current_active_user),
+    s3_client = Depends(get_s3_client) # Inject S3 client
+):
+    """
+    Generates a pre-signed URL to access the WebVTT file for a media item.
+    Requires ownership.
+    """
+    logger.info(f"User {user.id} requesting WebVTT URL for media_id: {media_id}")
+    if not db:
+        logger.error(f"DB session not available for webvtt-url (media_id: {media_id}, user: {user.id}).")
+        raise HTTPException(status_code=500, detail="Database not configured")
+    if not s3_client:
+        logger.error(f"S3 client not available for webvtt-url (media_id: {media_id}, user: {user.id}).")
+        raise HTTPException(status_code=500, detail="S3 service not available")
+
+    media_record = db.get(Media, media_id)
+    if not media_record:
+        logger.warning(f"WebVTT-URL: Media {media_id} not found (user: {user.id}).")
+        raise HTTPException(status_code=404, detail=f"Media with id {media_id} not found")
+
+    if media_record.owner_id != user.id:
+        logger.warning(f"WebVTT-URL: User {user.id} attempt to access media {media_id} owned by {media_record.owner_id}. Denied.")
+        raise HTTPException(status_code=403, detail="Not authorized to access this media resource")
+
+    if not media_record.webvtt_path:
+        logger.warning(f"WebVTT-URL: Media {media_id} has no webvtt_path (WebVTT S3 key) (user: {user.id}).")
+        raise HTTPException(status_code=404, detail="WebVTT file not available for this media")
+
+    presigned_url = generate_presigned_url(
+        bucket_name=settings.S3_BUCKET_NAME,
+        object_name=media_record.webvtt_path,
+        expiration=600, # 10 minutes
+        s3_client=s3_client
+    )
+
+    if not presigned_url:
+        logger.error(f"WebVTT-URL: Failed to generate presigned URL for media {media_id}, S3 key {media_record.webvtt_path} (user: {user.id}).")
+        raise HTTPException(status_code=500, detail="Could not generate WebVTT URL")
+        
+    logger.info(f"WebVTT-URL: Successfully generated for media {media_id} (user: {user.id}).")
+    return MediaURLResponse(url=presigned_url)

@@ -31,3 +31,4 @@ python-dotenv # For loading .env files
 fastapi-users[sqlalchemy] # Core package with SQLAlchemy support
 fastapi-users-db-sqlmodel # SQLModel adapter for FastAPI-Users
 python-jose[cryptography] # For JWT
+jamdict # For Japanese dictionary lookups
